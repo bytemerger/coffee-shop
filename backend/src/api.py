@@ -1,4 +1,6 @@
+from logging import exception
 import os
+from sqlalchemy.exc import IntegrityError
 from flask import Flask, request, jsonify, abort
 from sqlalchemy import exc
 import json
@@ -40,16 +42,28 @@ def get_drink_detail(payload):
     })
 
 
-'''
-@TODO implement endpoint
-    POST /drinks
-        it should create a new row in the drinks table
-        it should require the 'post:drinks' permission
-        it should contain the drink.long() data representation
-    returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
-        or appropriate status code indicating reason for failure
-'''
-
+@app.route('/drinks', methods=["POST"])
+@requires_auth('post:drinks')
+def post_drink(payload):
+    new_drink = request.get_json()
+    title = new_drink.get('title', None)
+    recipeJson = new_drink.get('recipe', None)
+    recipe = json.dumps(recipeJson) if recipeJson else abort(400, 'The recipe param is required')
+    if not title:
+        abort(400, 'The title param is required')
+    
+    drink = Drink(title=title, recipe=recipe)
+    
+    try:
+        drink.insert()
+        return jsonify({
+            'success': 'true',
+            'drinks': [drink.long()]
+        })
+    except IntegrityError:
+        abort(400, 'The title already exist')
+    except Exception:
+        abort(500)
 
 '''
 @TODO implement endpoint
@@ -95,6 +109,14 @@ def ressource_not_found(error):
         "status": 404,
         "message": "resource not found"
     }), 404
+
+@app.errorhandler(400)
+def ressource_not_found(error):
+    return jsonify({
+        "success": False, 
+        "status": 400,
+        "message": error.description or 'Bad Request'
+    }), 400
 
 @app.errorhandler(500)
 def ressource_not_found(error):
