@@ -1,5 +1,6 @@
 from logging import exception
 import os
+from pkg_resources import require
 from sqlalchemy.exc import IntegrityError
 from flask import Flask, request, jsonify, abort
 from sqlalchemy import exc
@@ -65,30 +66,38 @@ def post_drink(payload):
     except Exception:
         abort(500)
 
-'''
-@TODO implement endpoint
-    PATCH /drinks/<id>
-        where <id> is the existing model id
-        it should respond with a 404 error if <id> is not found
-        it should update the corresponding row for <id>
-        it should require the 'patch:drinks' permission
-        it should contain the drink.long() data representation
-    returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the updated drink
-        or appropriate status code indicating reason for failure
-'''
+@app.route('/drinks/<int:id>', methods=['PATCH'])
+@requires_auth('patch:drinks')
+def update_drinks(payload, id):
+    body = request.get_json()
+    title = body.get('title', None) or abort(400, 'The title parameter does exist')
+    drink = Drink.query.get(id)
+    if not drink:
+        abort(404, f'The drink with the ID {id} does not exist')
+    try:
+        drink.title = title
+        drink.update()
+        return jsonify({
+            'sucess': True,
+            'drinks': [drink.long()]
+        })
+    except Exception:
+        abort(500)
 
-
-'''
-@TODO implement endpoint
-    DELETE /drinks/<id>
-        where <id> is the existing model id
-        it should respond with a 404 error if <id> is not found
-        it should delete the corresponding row for <id>
-        it should require the 'delete:drinks' permission
-    returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
-        or appropriate status code indicating reason for failure
-'''
-
+@app.route('/drinks/<int:id>', methods=['DELETE'])
+@requires_auth('delete:drinks')
+def delete_drinks(payload, id):
+    drink = Drink.query.get(id)
+    if not drink:
+        abort(404, f'The drink with the ID {id} does not exist')
+    try:
+        drink.delete()
+        return jsonify({
+            'sucess': True,
+            'delete': id
+        })
+    except Exception:
+        abort(500)
 
 # Error Handling
 '''
